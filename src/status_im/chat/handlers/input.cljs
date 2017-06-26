@@ -39,7 +39,7 @@
   :select-chat-input-command
   (handlers/side-effect!
     (fn [{:keys [current-chat-id chat-ui-props] :as db}
-         [_ {:keys [prefill sequential-params] :as command} metadata]]
+         [_ {:keys [prefill sequential-params] :as command} metadata prevent-auto-focus?]]
       (dispatch [:set-chat-input-text (str (chat-utils/command-name command)
                                            const/spacing-char
                                            (when-not sequential-params
@@ -51,10 +51,12 @@
       (dispatch [:load-chat-parameter-box command 0])
       (if sequential-params
         (js/setTimeout
-          #(do (dispatch [:chat-input-focus :seq-input-ref])
+          #(do (when-not prevent-auto-focus?
+                 (dispatch [:chat-input-focus :seq-input-ref]))
                (dispatch [:set-chat-seq-arg-input-text (str/join const/spacing-char prefill)]))
           100)
-        (dispatch [:chat-input-focus :input-ref])))))
+        (when-not prevent-auto-focus?
+          (dispatch [:chat-input-focus :input-ref]))))))
 
 (handlers/register-handler
   :set-chat-input-metadata
@@ -96,7 +98,7 @@
   :update-suggestions
   (fn [{:keys [current-chat-id] :as db} [_ chat-id text]]
     (let [chat-id         (or chat-id current-chat-id)
-          chat-text       (or text (get-in db [:chats chat-id :input-text]) "")
+          chat-text       (str/trim (or text (get-in db [:chats chat-id :input-text]) ""))
           requests        (->> (suggestions/get-request-suggestions db chat-text)
                                (remove (fn [{:keys [type]}]
                                          (= type :grant-permissions))))
